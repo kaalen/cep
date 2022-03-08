@@ -23,12 +23,12 @@ def follow_face2(face_coordinate):
     x2 = face_coordinate[2]
     face_center = x1 + (x2 - x1) / 2
     rotate_power = cait.essentials.update_pid((screen_center - face_center))['value']
-    cait.essentials.control_motor_group('{"operation_list" :[{"hub_name": "Robot Inventor: A8:E2:C1:9B:EF:3B", "motor_name": "motor_A", "power": "' + str(rotate_power) + '"},{"hub_name": "Robot Inventor: A8:E2:C1:9B:EF:3B", "motor_name": "motor_E", "power": "' + str(rotate_power) + '"}]}')
+    cait.essentials.control_motor_group('{"operation_list" :[{"hub_name": "Robot Inventor: A8:E2:C1:95:22:45", "motor_name": "motor_A", "power": "' + str(rotate_power) + '"},{"hub_name": "Robot Inventor: A8:E2:C1:95:22:45", "motor_name": "motor_E", "power": "' + str(rotate_power) + '"}]}')
     
     
 def setup():
     cait.essentials.initialize_component('vision', processor='oakd', mode=[["add_rgb_cam_node", 640, 360], ["add_rgb_cam_preview_node"],["add_nn_node_pipeline", "face_detection", "face-detection-retail-0004_openvino_2021.2_6shave.blob", 300, 300],["add_nn_node", "face_landmarks", "landmarks-regression-retail-0009_openvino_2021.2_6shave.blob", 48, 48], ["add_nn_node", "face_features", "mobilefacenet.blob", 112, 112]])
-    cait.essentials.initialize_component('control', ['Robot Inventor: A8:E2:C1:9B:EF:3B'])
+    cait.essentials.initialize_component('control', ['Robot Inventor: A8:E2:C1:95:22:45'])
     cait.essentials.initialize_pid(0.05, 0.00001, 0)
     
 def main():
