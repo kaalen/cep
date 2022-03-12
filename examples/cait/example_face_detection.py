@@ -3,9 +3,14 @@
 import cait.essentials
 
 face = None
+vision_config = [
+    ["add_rgb_cam_node", 640, 360], 
+    ["add_rgb_cam_preview_node"],
+    ["add_nn_node_pipeline", "face_detection", "face-detection-retail-0004_openvino_2021.2_6shave.blob", 300, 300]
+]
 
 def setup():
-    cait.essentials.initialize_component('vision', processor='oakd', mode=[["add_rgb_cam_node", 640, 360], ["add_rgb_cam_preview_node"],["add_nn_node_pipeline", "face_detection", "face-detection-retail-0004_openvino_2021.2_6shave.blob", 300, 300]])
+    cait.essentials.initialize_component('vision', processor='oakd', mode=vision_config)
     
 def main():
     global face

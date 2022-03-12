@@ -14,6 +14,14 @@ rotate_power = None
 coordinates = None
 name = None
 
+vision_config = [
+    ["add_rgb_cam_node", 640, 360], 
+    ["add_rgb_cam_preview_node"],
+    ["add_nn_node_pipeline", "face_detection", "face-detection-retail-0004_openvino_2021.2_6shave.blob", 300, 300],
+    ["add_nn_node", "face_landmarks", "landmarks-regression-retail-0009_openvino_2021.2_6shave.blob", 48, 48], 
+    ["add_nn_node", "face_features", "mobilefacenet.blob", 112, 112]
+]
+
 """Describe this function...
 """
 def follow_face2(face_coordinate):
@@ -27,7 +35,7 @@ def follow_face2(face_coordinate):
     
     
 def setup():
-    cait.essentials.initialize_component('vision', processor='oakd', mode=[["add_rgb_cam_node", 640, 360], ["add_rgb_cam_preview_node"],["add_nn_node_pipeline", "face_detection", "face-detection-retail-0004_openvino_2021.2_6shave.blob", 300, 300],["add_nn_node", "face_landmarks", "landmarks-regression-retail-0009_openvino_2021.2_6shave.blob", 48, 48], ["add_nn_node", "face_features", "mobilefacenet.blob", 112, 112]])
+    cait.essentials.initialize_component('vision', processor='oakd', mode=vision_config)
     cait.essentials.initialize_component('control', ['Robot Inventor: A8:E2:C1:95:22:45'])
     cait.essentials.initialize_pid(0.05, 0.00001, 0)
     

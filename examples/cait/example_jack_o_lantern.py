@@ -17,6 +17,10 @@ coordinates = None
 face = None
 power = None
 selected_index = None
+vision_config = [
+    ["add_rgb_cam_node", 640, 360], 
+    ["add_rgb_cam_preview_node"],
+    ["add_nn_node_pipeline", "face_detection", "face-detection-retail-0004_openvino_2021.2_6shave.blob", 300, 300]]
 
 """Describe this function...
 """
@@ -48,7 +52,7 @@ def dispatch_func_1():
 
 
 def setup():
-    cait.essentials.initialize_component('vision', processor='oakd', mode=[["add_rgb_cam_node", 640, 360], ["add_rgb_cam_preview_node"],["add_nn_node_pipeline", "face_detection", "face-detection-retail-0004_openvino_2021.2_6shave.blob", 300, 300]])
+    cait.essentials.initialize_component('vision', processor='oakd', mode=vision_config)
     cait.essentials.initialize_component('control', ['Robot Inventor: A8:E2:C1:9B:10:36'])
     cait.essentials.initialize_pid(0.015, 0, 0)
     cait.essentials.initialize_component('voice', mode='on_devie')

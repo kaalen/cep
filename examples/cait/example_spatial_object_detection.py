@@ -3,9 +3,16 @@
 import cait.essentials
 
 objects = None
+vision_config = [
+    ["add_rgb_cam_node", 640, 360], 
+    ["add_rgb_cam_preview_node"],
+    ["add_stereo_cam_node", False], 
+    ["add_stereo_frame_node"],
+    ["add_spatial_mobilenetSSD_node", "object_detection", "ssdlite_mbv2_coco.blob", 300, 300, 0.5]
+]
 
 def setup():
-    cait.essentials.initialize_component('vision', processor='oakd', mode=[["add_rgb_cam_node", 640, 360], ["add_rgb_cam_preview_node"],["add_stereo_cam_node", False], ["add_stereo_frame_node"],["add_spatial_mobilenetSSD_node", "object_detection", "ssdlite_mbv2_coco.blob", 300, 300, 0.5]])
+    cait.essentials.initialize_component('vision', processor='oakd', mode=vision_config)
     
 def main():
     global objects
