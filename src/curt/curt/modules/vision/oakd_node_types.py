@@ -4,6 +4,7 @@ Written by Michael Ng <michaelng@cortic.ca>, 2021
 
 """
 
+#TODO: may need to add definitions here
 OAKDNodeTypes = [
     "rgb_camera",
     "stereo_camera",

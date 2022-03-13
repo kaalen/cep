@@ -293,9 +293,11 @@ class OAKDPipeline:
         self.device_nodes["rgb_camera"].preview.link(manip.inputImage)
 
         spatialDetectionNetwork = self.pipeline.createMobileNetSpatialDetectionNetwork()
+        blob_path = str(Path("/models/oakd/" + nn_name).resolve().absolute())
         spatialDetectionNetwork.setBlobPath(
-            str(Path("/models/oakd/" + nn_name).resolve().absolute())
+            blob_path
         )
+        logging.info("Blob path set: " + blob_path)
         spatialDetectionNetwork.setConfidenceThreshold(threshold)
         spatialDetectionNetwork.input.setBlocking(False)
         spatialDetectionNetwork.setBoundingBoxScaleFactor(0.5)
