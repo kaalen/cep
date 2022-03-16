@@ -188,7 +188,7 @@ def initialize_vision(processor="local", mode=[], from_web=False):
             vision_initialized = False
             return (
                 False,
-                "Failed to initialzie oakd pipeline, please check if the device is connected.",
+                "Failed to initialize oakd pipeline, please check if the device is connected.",
             )
     elif processor == "cpu":
         success = False
@@ -1063,7 +1063,8 @@ def detect_objects(processor, spatial=False, for_streaming=False):
                 worker, params=[rgb_frame_handler]
             )
 
-        objects = CURTCommands.get_result(object_detection_handler, for_streaming)[
+        result = CURTCommands.get_result(object_detection_handler, for_streaming)
+        objects = result[
             "dataValue"
         ]["data"]
         # logging.warning("Objects: " + str(objects))
