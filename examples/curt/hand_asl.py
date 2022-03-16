@@ -20,10 +20,13 @@ from curt.command import CURTCommands
 
 # Modify these to your own workers
 # Format is "<host_name>/<module_type>/<service_name>/<worker_name>"
-OAKD_PIPELINE_WORKER = "charlie/vision/oakd_service/oakd_pipeline"
-RGB_CAMERA_WORKER = "charlie/vision/oakd_service/oakd_rgb_camera_input"
-HAND_LADNMARKS_WORKER = "charlie/vision/oakd_service/oakd_hand_landmarks"
-HAND_ASL_WORKER = "charlie/vision/oakd_service/oakd_hand_asl"
+import socket
+full_domain_name = socket.getfqdn()
+
+OAKD_PIPELINE_WORKER = full_domain_name + "/vision/oakd_service/oakd_pipeline"
+RGB_CAMERA_WORKER = full_domain_name + "/vision/oakd_service/oakd_rgb_camera_input"
+HAND_LADNMARKS_WORKER = full_domain_name + "/vision/oakd_service/oakd_hand_landmarks"
+HAND_ASL_WORKER = full_domain_name + "/vision/oakd_service/oakd_hand_asl"
 
 preview_width = 640
 preview_heigth = 360
