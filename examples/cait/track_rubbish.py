@@ -61,23 +61,6 @@ def dispatch_func_0():
 
 
 def setup():
-    oakd_pipeline_config = [
-        ["add_rgb_cam_node", preview_width, preview_heigth],
-        ["add_rgb_cam_preview_node"],
-        ["add_nn_node", "palm_detection", "palm_detection_sh6.blob", nn_input_size, nn_input_size],
-        ["add_nn_node", "hand_landmarks", "hand_landmark_sh6.blob", nn_input_size, nn_input_size],
-        ["add_nn_node", "hand_asl", "hand_asl_6_shaves.blob", nn_input_size, nn_input_size],
-    ]
-
-    rubbish_detection_pipeline_config = [
-        ["version", "2021.4"], # need to explicitly specify OpenVINO version
-        ["add_rgb_cam_node", 640, 360], 
-        ["add_rgb_cam_preview_node"],
-        ["add_stereo_cam_node", False], 
-        ["add_stereo_frame_node"],
-        ["add_spatial_mobilenetSSD_node", "object_detection", "rubbish-detection_openvino_2021.4_5shave.blob", 300, 300, 0.5]
-    ]
-
     spatial_object_detection_config = [ #this one definitely works
         ["add_rgb_cam_node", 640, 360], 
         ["add_rgb_cam_preview_node"],
@@ -93,6 +76,15 @@ def setup():
         ["add_stereo_frame_node"],
         ["add_spatial_mobilenetSSD_node", "object_detection", "face-detection-retail-0004_openvino_2021.2_6shave.blob", 300, 300]]
     
+    rubbish_detection_pipeline_config = [
+        ["version", "2021.4"], # need to explicitly specify OpenVINO version
+        ["add_rgb_cam_node", 640, 360], 
+        ["add_rgb_cam_preview_node"],
+        ["add_stereo_cam_node", False], 
+        ["add_stereo_frame_node"],
+        ["add_spatial_mobilenetSSD_node", "object_detection", "rubbish-detection_openvino_2021.4_5shave.blob", 300, 300, 0.5]
+    ]
+
     # Using face detection model for now as it's easier to use for testing. Faces are more reliably recognised compared to other stuff
     vision_init_result = cait.essentials.initialize_component('vision', processor='oakd', mode=rubbish_detection_pipeline_config)
     if not vision_init_result[0]:
