@@ -8,9 +8,12 @@ from curt.command import CURTCommands
 
 # Modify these to your own workers
 # Format is "<host_name>/<module_type>/<service_name>/<worker_name>"
-OAKD_PIPELINE_WORKER = "charlie/vision/oakd_service/oakd_pipeline"
-RGB_CAMERA_WORKER = "charlie/vision/oakd_service/oakd_rgb_camera_input"
-FACE_DETECTION_WORKER = "charlie/vision/vision_processor_service/face_detection"
+import socket
+full_domain_name = socket.getfqdn()
+
+OAKD_PIPELINE_WORKER = full_domain_name + "/vision/oakd_service/oakd_pipeline"
+RGB_CAMERA_WORKER = full_domain_name + "/vision/oakd_service/oakd_rgb_camera_input"
+FACE_DETECTION_WORKER = full_domain_name + "/vision/vision_processor_service/face_detection"
 
 preview_width = 640
 preview_heigth = 360
@@ -47,4 +50,5 @@ while True:
 
     detected_face = CURTCommands.get_result(face_detection_handler)
 
+    #NOTE: this definitely works... but only displays face coords in console.. any chance we can see a preview
     print(detected_face)
