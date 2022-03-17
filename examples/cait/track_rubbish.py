@@ -2,6 +2,7 @@
 
 from sqlalchemy import true
 import cait.essentials
+import logging
 import threading
 import time
 
@@ -98,13 +99,16 @@ def setup():
 def main():
     global object_coordinate, screen_center, rotate_power, x1, object_of_interest, x2, object_center, coordinates, object2, power
     while True:
-        #TODO: error, nothing detected here, returns empty object
         object_of_interest = cait.essentials.detect_objects(processor='oakd', spatial=True)
+
+        # TODO: rubbish = bicycle, labels for objects are hardcoded, need to change that like demo app
 
         target_object_index=-1
         if object_of_interest is not None:
+            replace_labels(object_of_interest)
             if target_object_name in object_of_interest["names"]:
                 target_object_index = object_of_interest["names"].index(target_object_name)
+                logging.info("Detected " + object_of_interest["names"][target_object_index])
             # object_of_interest['names'] //grab first index of the target object class
             # object_of_interest['coordinates']
         
@@ -116,6 +120,20 @@ def main():
             object2 = coordinates[target_object_index]
             # dispatch_thread_0 = threading.Thread(target=dispatch_func_0, daemon=True)
             # dispatch_thread_0.start()
+
+"""Replaces hardcoded labels with the ones from our CV model. 
+This is a quick and dirty workaround.
+
+Returns:
+    object: object["names"] values replaced with either rubbish or biomaterial
+"""
+def replace_labels(detected_object):
+    for i in range(len(detected_object["names"])):
+        if detected_object["names"][i] == "bicycle":
+            detected_object["names"][i] = "rubbish"
+        elif detected_object["names"][i] == "person":
+            detected_object["names"][i] = "biomaterial"
+
 
 if __name__ == "__main__":
     setup()
