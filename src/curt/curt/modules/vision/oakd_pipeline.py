@@ -20,6 +20,7 @@ class OAKDPipeline:
         self.device_nodes = {}
         self.nn_node_input_sizes = {}
         self.pipeline = dai.Pipeline()
+        logging.info("=== setOpenVINOVersion hardcoded")
         self.pipeline.setOpenVINOVersion(version=dai.OpenVINO.Version.VERSION_2021_3)
         self.face_detect_length = 256
         self.face_recognize_length = 112
@@ -66,6 +67,7 @@ class OAKDPipeline:
         #     self.node_to_display = []
         #     self.photo_count = 0
         #     logging.warning("PIPELINE RESET DONE")
+        logging.info("Configuring oakd_pipeline");
         face_detection_template = None
         face_detection_code = ""
         try:
@@ -74,7 +76,6 @@ class OAKDPipeline:
         except:
             pass
         for data in config_data:
-            logging.warning(data)
             if data[0] == "reset":
                 if self.pipeline_started and self.device is not None:
                     self.reset = True
@@ -91,6 +92,7 @@ class OAKDPipeline:
                 logging.warning("PIPELINE RESET DONE")
                 return True
             elif data[0] == "version":
+                logging.warning("==== config_pipeline_version data: %s", data[1])
                 self.config_pipeline_version(data[1])
             elif data[0] == "add_rgb_cam_node":
                 # if face_detection_template is not None:
@@ -179,6 +181,10 @@ class OAKDPipeline:
         elif version == "2021.3":
             self.pipeline.setOpenVINOVersion(
                 version=dai.OpenVINO.Version.VERSION_2021_3
+            )
+        elif version == "2021.4":
+            self.pipeline.setOpenVINOVersion(
+                version=dai.OpenVINO.Version.VERSION_2021_4
             )
 
     def run_inference(self, request_data):
