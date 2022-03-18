@@ -6,7 +6,6 @@ frames of recognition.
 
 """
 
-from numpy import full
 from curt.command import CURTCommands
 
 # Modify these to your own workers
