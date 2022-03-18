@@ -34,40 +34,42 @@ if args.model is None:
     args.model = "src/curt/models/modules/vision/platforms/oakd/rubbish_detection/rubbish-detection_openvino_2021.4_5shave.blob"
     #blobconverter.from_zoo(name="mobilenet-ssd", shaves=7)
 
+labelMap = ["", "biomaterial", "rubbish"]
+
 # Create pipeline
-# pipeline = dai.Pipeline()
-
 pm = PipelineManager()
-# pm.createColorCam(xout=True)
-
 nm = NNetManager(inputSize=(300, 300), nnFamily="mobilenet")
 
-# Define a neural network that will make predictions based on the source frames
+# Define sources and outputs
+cam = pm.pipeline.create(dai.node.ColorCamera)
 nn = pm.pipeline.create(dai.node.MobileNetDetectionNetwork)
-# nn = nm.createNN(pipeline=pm.pipeline, nodes=pm.nodes, source=Previews.color.name,
-#                 blobPath=args.model)
+
+xoutVideo = pm.pipeline.create(dai.node.XLinkOut)
+xoutPreview = pm.pipeline.create(dai.node.XLinkOut)
+nnOut = pm.pipeline.create(dai.node.XLinkOut)
+
+xoutVideo.setStreamName("video")
+xoutPreview.setStreamName("preview")
+nnOut.setStreamName("nn")
+
+# Set color camera properties
+cam.setPreviewSize(PREVIEW_WIDTH, PREVIEW_HEIGHT)
+cam.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
+cam.setInterleaved(False)
+cam.setPreviewKeepAspectRatio(False)
+
+# Define a neural network that will make predictions based on the source frames
 pm.addNn(nn)
 nn.setConfidenceThreshold(0.5)
 nn.setBlobPath(args.model)
 nn.setNumInferenceThreads(2)
 nn.input.setBlocking(False)
 
-# Create color camera node.
-cam = pm.pipeline.create(dai.node.ColorCamera)
-cam.setPreviewSize(PREVIEW_WIDTH, PREVIEW_HEIGHT)
-cam.setInterleaved(False)
 # Connect (link) the camera preview output to the neural network input
+cam.video.link(xoutVideo.input)
+cam.preview.link(xoutPreview.input)
 cam.preview.link(nn.input)
-
-# Create XLinkOut object as conduit for passing camera frames to the host
-xoutFrame = pm.pipeline.create(dai.node.XLinkOut)
-xoutFrame.setStreamName("outFrame")
-cam.preview.link(xoutFrame.input)
-
-# Create neural network output (inference) stream
-nnOut = pm.pipeline.create(dai.node.XLinkOut)
-nnOut.setStreamName("nnOut")
-nn.out.link(nnOut.input)
+nn.out.link(nnOut.input) # NN output (inference) stream
 
 # Create and configure the object tracker
 objectTracker = pm.pipeline.create(dai.node.ObjectTracker)
@@ -90,12 +92,11 @@ objectTracker.out.link(trackerOut.input)
 # Pipeline defined, now the device is connected to
 with dai.Device(pm.pipeline) as device:
     pv = PreviewManager(display=[Previews.color.name])
-    # pv.createQueues(device)
-    # nm.createQueues(device)
 
-    # Output queue for retrieving camera frames from device
-    qOut_Frame = device.getOutputQueue(name="outFrame", maxSize=4, blocking=False)
-    qDet = device.getOutputQueue(name="nnOut", maxSize=4, blocking=False)
+    # Output queues will be used to get the frames and nn data from the outputs defined above
+    qVideo = device.getOutputQueue(name="video", maxSize=4, blocking=False)
+    qPreview = device.getOutputQueue(name="preview", maxSize=4, blocking=False)
+    qDet = device.getOutputQueue(name="nn", maxSize=4, blocking=False)
     tracklets = device.getOutputQueue("tracklets", 4, False)
 
     if args.save_path:
@@ -110,12 +111,15 @@ with dai.Device(pm.pipeline) as device:
         return True
 
     def get_frame():
-        in_Frame = qOut_Frame.get()
-        frame = in_Frame.getCvFrame()
+        inVideo = qVideo.get()
+        frame = inVideo.getCvFrame()
         return True, frame
 
     startTime = time.monotonic()
     detections = []
+    previewFrame = None
+    videoFrame = None
+   
     frame_count = 0
     counter = [0, 0, 0, 0]  # left, right, up, down
 
@@ -124,29 +128,57 @@ with dai.Device(pm.pipeline) as device:
     def to_planar(arr: np.ndarray, shape: tuple) -> np.ndarray:
         return cv2.resize(arr, shape).transpose(2, 0, 1).flatten()
 
+    # nn data, being the bounding box locations, are in <0..1> range - they need to be normalized with frame width/height
+    def frameNorm(frame, bbox):
+        normVals = np.full(len(bbox), frame.shape[0])
+        normVals[::2] = frame.shape[1]
+        return (np.clip(np.array(bbox), 0, 1) * normVals).astype(int)
+
+    def displayFrame(name, frame):
+        color = (255, 0, 0)
+        for detection in detections:
+            bbox = frameNorm(frame, (detection.xmin, detection.ymin, detection.xmax, detection.ymax))
+            cv2.putText(frame, labelMap[detection.label], (bbox[0] + 10, bbox[1] + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
+            cv2.putText(frame, f"{int(detection.confidence * 100)}%", (bbox[0] + 10, bbox[1] + 40), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
+            cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
+        # Show the frame
+        cv2.imshow(name, frame)
+
+    cv2.namedWindow("video", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow("video", 1280, 720)
+    print("Resize video window with mouse drag!")
+
     while should_run():
         # Get image frames from camera or video file
         read_correctly, frame = get_frame()
         if not read_correctly:
             break
 
-        in_Frame = qOut_Frame.tryGet()
-
-        if in_Frame is not None:
-            frame = in_Frame.getCvFrame()
-            cv2.putText(frame, "NN fps: {:.2f}".format(frame_count / (time.monotonic() - startTime)),
-                        (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color=(255, 255, 255))
-
+        # Instead of get (blocking), we use tryGet (non-blocking) which will return the available data or None otherwise
+        inVideo = qVideo.tryGet()
+        inPreview = qPreview.tryGet()
         inDet = qDet.tryGet()
+
+        if inVideo is not None:
+            videoFrame = inVideo.getCvFrame()
+            cv2.putText(videoFrame, "NN fps: {:.2f}".format(frame_count / (time.monotonic() - startTime)),
+                        (2, videoFrame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.4, color=(255, 255, 255))
+
+        if inVideo is not None:
+            videoFrame = inVideo.getCvFrame()
+
+        if inPreview is not None:
+            previewFrame = inPreview.getCvFrame()
+
         if inDet is not None:
             detections = inDet.detections
             frame_count += 1
 
         track = tracklets.tryGet()
 
-        if frame is not None:
-            height = frame.shape[0]
-            width = frame.shape[1]
+        if videoFrame is not None:
+            height = videoFrame.shape[0]
+            width = videoFrame.shape[1]
 
             if track:
                 trackletsData = track.tracklets
@@ -193,37 +225,37 @@ with dai.Device(pm.pipeline) as device:
 
                     if t.status != dai.Tracklet.TrackingStatus.LOST and t.status != dai.Tracklet.TrackingStatus.REMOVED:
                         text = "ID {}".format(t.id)
-                        cv2.putText(frame, text, (centroid[0] - 10, centroid[1] - 10),
+                        cv2.putText(videoFrame, text, (centroid[0] - 10, centroid[1] - 10),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
                         cv2.circle(
-                            frame, (centroid[0], centroid[1]), 4, (255, 255, 255), -1)
+                            videoFrame, (centroid[0], centroid[1]), 4, (255, 255, 255), -1)
 
             # Draw ROI line
             if args.axis:
-                cv2.line(frame, (int(args.roi_position*width), 0),
+                cv2.line(videoFrame, (int(args.roi_position*width), 0),
                         (int(args.roi_position*width), height), (0xFF, 0, 0), 5)
             else:
-                cv2.line(frame, (0, int(args.roi_position*height)),
+                cv2.line(videoFrame, (0, int(args.roi_position*height)),
                         (width, int(args.roi_position*height)), (0xFF, 0, 0), 5)
 
             # display count and status
             font = cv2.FONT_HERSHEY_SIMPLEX
             if args.axis:
-                cv2.putText(frame, f'Left: {counter[0]}; Right: {counter[1]}', (
+                cv2.putText(videoFrame, f'Left: {counter[0]}; Right: {counter[1]}', (
                     10, 35), font, 0.8, (0, 0xFF, 0xFF), 2, cv2.FONT_HERSHEY_SIMPLEX)
             else:
-                cv2.putText(frame, f'Up: {counter[2]}; Down: {counter[3]}', (
+                cv2.putText(videoFrame, f'Up: {counter[2]}; Down: {counter[3]}', (
                     10, 35), font, 0.8, (0, 0xFF, 0xFF), 2, cv2.FONT_HERSHEY_SIMPLEX)
 
             if args.show:
-                cv2.imshow('cumulative_object_counting', frame)
-                if cv2.waitKey(25) & 0xFF == ord('q'):
-                    break
+                if videoFrame is not None:
+                    displayFrame("video", videoFrame)
+
+                if previewFrame is not None:
+                    displayFrame("preview", previewFrame)
 
             if args.save_path:
-                out.write(frame)
-
-        pv.showFrames()
+                out.write(videoFrame)
 
         if cv2.waitKey(1) == ord('q'):
             break
