@@ -125,7 +125,7 @@ def main():
 This is a quick and dirty workaround.
 
 Returns:
-    object: object["names"] values replaced with either rubbish or biomaterial
+    object: object["names"] values replaced with either rubbish or biomaterial 
 """
 def replace_labels(detected_object):
     for i in range(len(detected_object["names"])):
