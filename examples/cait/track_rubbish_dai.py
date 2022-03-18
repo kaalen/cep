@@ -89,7 +89,19 @@ trackerOut = pm.pipeline.create(dai.node.XLinkOut)
 trackerOut.setStreamName("tracklets")
 objectTracker.out.link(trackerOut.input)
 
-# Pipeline defined, now the device is connected to
+def display_label_count(videoFrame, labelMap, labelCounter):
+    """Displays label counter for tracked object on the video frame
+
+        Args:
+        videoFrame: video frame on which to display count
+        labelMap: array mapping numeric labels to string
+        labelCounter: int array of counters for each label
+    """
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    for i in range(len(labelCounter)):  
+        if labelMap[i] != "":              
+            cv2.putText(videoFrame, f'{labelMap[i]}: {labelCounter[i]}', (10, 60+(25*i)), font, 0.8, (0, 0, 255), 2, font)
+
 with dai.Device(pm.pipeline) as device:
     pv = PreviewManager(display=[Previews.color.name])
 
@@ -122,6 +134,7 @@ with dai.Device(pm.pipeline) as device:
    
     frame_count = 0
     counter = [0, 0, 0, 0]  # left, right, up, down
+    labelCounter = [0] * len(labelMap)
 
     trackableObjects = {}
 
@@ -195,17 +208,19 @@ with dai.Device(pm.pipeline) as device:
 
                     # If new tracklet, save its centroid
                     if t.status == dai.Tracklet.TrackingStatus.NEW:
-                        to = trackable_object.TrackableObject(t.id, centroid)
+                        to = trackable_object.TrackableObject(t.id, centroid, t.label)
                     elif to is not None:
                         if args.axis and not to.counted:
                             x = [c[0] for c in to.centroids]
                             direction = centroid[0] - np.mean(x)
 
                             if centroid[0] > args.roi_position*width and direction > 0 and np.mean(x) < args.roi_position*width:
-                                counter[1] += 1
+                                counter[1] += 1 #left
+                                labelCounter[to.label] += 1
                                 to.counted = True
                             elif centroid[0] < args.roi_position*width and direction < 0 and np.mean(x) > args.roi_position*width:
-                                counter[0] += 1
+                                counter[0] += 1 #right
+                                labelCounter[to.label] += 1
                                 to.counted = True
 
                         elif not args.axis and not to.counted:
@@ -213,11 +228,14 @@ with dai.Device(pm.pipeline) as device:
                             direction = centroid[1] - np.mean(y)
 
                             if centroid[1] > args.roi_position*height and direction > 0 and np.mean(y) < args.roi_position*height:
-                                counter[3] += 1
+                                counter[3] += 1 #down
+                                labelCounter[to.label] += 1
                                 to.counted = True
                             elif centroid[1] < args.roi_position*height and direction < 0 and np.mean(y) > args.roi_position*height:
-                                counter[2] += 1
+                                counter[2] += 1 #up
+                                labelCounter[to.label] += 1
                                 to.counted = True
+
 
                         to.centroids.append(centroid)
 
@@ -247,12 +265,15 @@ with dai.Device(pm.pipeline) as device:
                 cv2.putText(videoFrame, f'Up: {counter[2]}; Down: {counter[3]}', (
                     10, 35), font, 0.8, (0, 0xFF, 0xFF), 2, cv2.FONT_HERSHEY_SIMPLEX)
 
+            display_label_count(videoFrame, labelMap, labelCounter)
+
+
             if args.show:
                 if videoFrame is not None:
                     displayFrame("video", videoFrame)
 
-                if previewFrame is not None:
-                    displayFrame("preview", previewFrame)
+                # if previewFrame is not None:
+                #     displayFrame("preview", previewFrame)
 
             if args.save_path:
                 out.write(videoFrame)
