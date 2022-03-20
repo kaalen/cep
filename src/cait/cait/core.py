@@ -1095,6 +1095,96 @@ def detect_objects(processor, spatial=False, for_streaming=False):
         names.append(object_labels[int(obj[-1])])
     return names, coordinates
 
+def detect_rubbish(processor, spatial=False, for_streaming=False):
+    global oakd_nodes
+    global vision_initialized
+    if not vision_initialized:
+        logging.info(
+            "Please call initialize_vision() function before using the vision module"
+        )
+        return None
+    change_vision_mode("rubbish_detection")
+    if current_camera == "oakd":
+        camera_worker = CURTCommands.get_worker(
+            full_domain_name + "/vision/oakd_service/oakd_rgb_camera_input"
+        )
+    elif current_camera == "webcam":
+        camera_worker = CURTCommands.get_worker(
+            full_domain_name + "/vision/vision_input_service/webcam_input"
+        )
+    elif current_camera == "picam":
+        camera_worker = CURTCommands.get_worker(
+            full_domain_name + "/vision/vision_input_service/picam_input"
+        )
+    if processor == "oakd":
+        worker = CURTCommands.get_worker(
+            full_domain_name + "/vision/oakd_service/oakd_rubbish_detection"
+        )
+    else:
+        worker = CURTCommands.get_worker(
+            full_domain_name + "/vision/vision_processor_service/rubbish_detection"
+        )
+    coordinates = []
+    names = []
+    objects = []
+    if camera_worker is not None and worker is not None:
+        if processor == "oakd":
+            if spatial:
+                object_detection_handler = CURTCommands.request(
+                    worker, params=["get_spatial_rubbish_detections"]
+                )
+            else:
+                if current_camera != "oakd":
+                    rgb_frame_handler = CURTCommands.request(
+                        camera_worker, params=["get_rgb_frame"]
+                    )
+                    object_detection_handler = CURTCommands.request(
+                        worker, params=["detect_rubbish", rgb_frame_handler]
+                    )
+                else:
+                    object_detection_handler = CURTCommands.request(
+                        worker, params=["detect_rubbish_pipeline"]
+                    )
+        else:
+            rgb_frame_handler = CURTCommands.request(
+                camera_worker, params=["get_rgb_frame"]
+            )
+            object_detection_handler = CURTCommands.request(
+                worker, params=[rgb_frame_handler]
+            )
+
+        result = CURTCommands.get_result(object_detection_handler, for_streaming)
+        objects = result[
+            "dataValue"
+        ]["data"]
+        # logging.warning("Objects: " + str(objects))
+        if not isinstance(objects, list):
+            objects = []
+    width = 640
+    height = 360
+    if current_camera != "oakd":
+        width = 640
+        height = 480
+    for obj in objects:
+        if len(obj) > 5:
+            coordinates.append(
+                [
+                    obj[0] * width,
+                    obj[1] * height,
+                    obj[2] * width,
+                    obj[3] * height,
+                    obj[4],
+                    obj[5],
+                    obj[6],
+                ]
+            )
+        else:
+            coordinates.append(
+                [obj[0] * width, obj[1] * height, obj[2] * width, obj[3] * height]
+            )
+        names.append(object_labels[int(obj[-1])])
+    return names, coordinates
+
 
 def classify_image(for_streaming=False):
     global oakd_nodes

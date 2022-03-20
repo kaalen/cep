@@ -393,6 +393,23 @@ def detect_objects(processor, spatial=False):
     else:
         return None
 
+def detect_rubbish(processor, spatial=False):
+    """detect the rubbish appearing in camera feed
+
+    Returns:
+        (list): names of the objects
+        (list): coordinates of objects
+    """
+    objects = core.detect_rubbish(processor, spatial=spatial)
+
+    if objects is not None:
+        names, coordinates = objects
+        objects = {"success": True, "names": names, "coordinates": coordinates}
+        return objects
+    else:
+        return None
+
+
 
 def facemesh_estimation():
     """Estimate the meshes of faces

@@ -195,7 +195,13 @@ def draw_object_detection(img, names, coordinates):
 
         sub_img = img[y1:y2, x1:x2]
         rect = np.ones(sub_img.shape, dtype=np.uint8)
-        label_idx = object_labels.index(label)
+
+        # Simple Work Around For Custom Model
+        try:
+            label_idx = object_labels.index(label)
+        except ValueError:
+            label_idx = 0
+
         rect[:, :, 0] = OBJ_COLOR[label_idx][0]
         rect[:, :, 1] = OBJ_COLOR[label_idx][1]
         rect[:, :, 2] = OBJ_COLOR[label_idx][2]

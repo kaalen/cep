@@ -14,6 +14,7 @@ OAKDNodeTypes = [
     "face_emotions",
     "object_detection",
     "body_detection",
+    "rubbish_detection",
     "body_landmarks",
     "palm_detection",
     "hand_landmarks",
