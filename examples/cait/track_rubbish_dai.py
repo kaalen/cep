@@ -31,7 +31,7 @@ parser.add_argument('-s', '--sync', action="store_true",
 args = parser.parse_args()
 
 if args.model is None:
-    args.model = "src/curt/models/modules/vision/platforms/oakd/rubbish_detection/rubbish-detection_openvino_2021.4_5shave.blob"
+    args.model = "src/curt/models/modules/vision/platforms/oakd/rubbishdetection_fCNN_openvino_2021.4_6shave.blob"
     #blobconverter.from_zoo(name="mobilenet-ssd", shaves=7)
 
 labelMap = ["", "biomaterial", "rubbish"]
