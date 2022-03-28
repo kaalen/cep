@@ -20,7 +20,12 @@
             "dependsOn": [
                 "Restart CAIT",
                 "Restart CURT"
-            ]
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         }
     ],
 }
