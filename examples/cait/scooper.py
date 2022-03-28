@@ -75,6 +75,14 @@ class Scooper:
 
         self.setCatcherAngle(self.catchAngle)
 
+        self.reset()
+
+    def reset(self):
+        self.startLock.acquire()
+        self.hasStarted = False
+        self.state = self.States.WAIT_TO_CATCH
+        self.startLock.release()
+
     def beginCatching(self):
         self.setCatcherAngle(self.catchAngle)
         time.sleep(self.catchDuration)
