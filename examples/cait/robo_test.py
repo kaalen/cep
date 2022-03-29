@@ -1,27 +1,16 @@
-import track_rubbish_dai
-from scooper import Scooper
 from threading import Thread
 import time
-
-scoop = Scooper()
-
-def launch_scooper(dir, count):
-    if dir == "up":
-        scoop.startLock.acquire()
-        if scoop.hasStarted:
-            return
-        scoop.startLock.release()
-        Thread(target=scoop.begin).start()
+from sweeper import SweeperController
 
 
 def main():
-    launch_scooper('up', 5)
-    print('start sleep')
-    time.sleep(50)
-    print('stop_sleep')
+    sweeper = SweeperController()
+    sweeper.runSweeper()
+    sweeper.goToLocation(300)
+    time.sleep(3)
+    print(sweeper.isBusy())
     while True:
-        pass
-    pass
+        continue
 
 if __name__ == "__main__":
     main()
