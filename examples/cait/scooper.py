@@ -73,8 +73,6 @@ class Scooper:
         self.state = self.States.DRIVING_TO_CATCH
         self.driveToCatch()
 
-        self.setCatcherAngle(self.catchAngle)
-
         self.reset()
 
     def reset(self):
