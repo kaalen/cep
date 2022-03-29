@@ -5,7 +5,7 @@ import time
 import cait.essentials
 
 from queue import Queue
-from threading import Thread, Lock
+from threading import Thread, Lock, Condition
 
 # Class To Drive Robot To Provided Position Or Percent Between Start And End Point
 # Location, Start And End Are Defined As Duration * DrivePower Relative To Start 
@@ -16,14 +16,21 @@ class Sweeper(Scooper):
     def __init__(self, end=50, dump=50):
         super().__init__()
 
+        # Location Vars
         self.location = 0
         self.start = 0
         self.end = end
         self.dumpLoc = dump
+
+        # Sync Vars
         self.messages = Queue()
-        self.lock = Lock()
+        self.busyLock = Lock()
+        # State Vars
         self.completingAction = False
+
+        # Init Message
         print('init sweeper')
+
 
     # Run Thread Loop
     def run(self):
@@ -32,9 +39,9 @@ class Sweeper(Scooper):
             print(f'Description: {job.description}')
             print(f'data: {job.data}')
 
-            self.lock.acquire()
+            self.busyLock.acquire()
             self.completingAction = True
-            self.lock.release()
+            self.busyLock.release()
 
 
             if job.description == "dtd":
@@ -53,10 +60,15 @@ class Sweeper(Scooper):
                 self.setScoopToggle()
 
             if self.messages.empty():
-                self.lock.acquire()
+                self.busyLock.acquire()
                 self.completingAction = False
-                self.lock.release()
+                self.busyLock.release()
 
+           
+
+
+
+    # Move Functions ------
 
     # Function To Drive To Dump Location
     def driveToDump(self):
@@ -107,18 +119,28 @@ class Job:
 class SweeperController:
     
     def __init__(self, end=50, dump=50):
+
+        # Child Variables
         self.sweeper = Sweeper(end, dump)
         self.messages = self.sweeper.messages
+
+
+        # Init Message
         print('init controller')
 
     # Run Thread Loop
     def runSweeper(self):
         Thread(target = self.sweeper.run).start()
 
+    # Method To Clear Action Queue
+    def clear(self):
+        while not self.messages.empty():
+            self.messages.get(block=False)
+
     def isBusy(self):
-        self.sweeper.lock.acquire()
+        self.sweeper.busyLock.acquire()
         isBusy = self.sweeper.completingAction
-        self.sweeper.lock.release()
+        self.sweeper.busyLock.release()
         return isBusy
 
     # Function To Drive To Dump Location
