@@ -1,6 +1,8 @@
 import track_rubbish_dai
 from scooper import Scooper
 from threading import Thread
+import time
+
 scoop = Scooper()
 
 def launch_scooper(dir, count):
@@ -13,8 +15,12 @@ def launch_scooper(dir, count):
 
 
 def main():
-    track_rubbish_dai.subscribeOnCount(launch_scooper)
-    track_rubbish_dai.main()
+    launch_scooper('up', 5)
+    print('start sleep')
+    time.sleep(50)
+    print('stop_sleep')
+    while True:
+        pass
     pass
 
 if __name__ == "__main__":
