@@ -22,8 +22,8 @@ class Scooper:
 
 
     def __init__(self, hubName=lego_hub_name,
-     dropAngle=-159, catchAngle=-116,
-      driveDuration=2, drivePower=40,
+     dropAngle=-159, catchAngle=-130,
+      driveDuration=2, drivePower=20,
       catchDuration=2, dropDuration=5, debug=False) -> None:
 
         self.hubName = hubName 
