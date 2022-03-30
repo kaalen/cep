@@ -18,15 +18,13 @@ class Scooper:
     motors = {"wheels" : "motor_B",
     "scoop" : "motor_D",
     "cam" : "motor_F"}
-
-
-    
+   
 
 
     def __init__(self, hubName=lego_hub_name,
      dropAngle=-159, catchAngle=-116,
-      driveDuration=5, drivePower=40,
-      catchDuration=5, dropDuration=5, debug=False) -> None:
+      driveDuration=2, drivePower=40,
+      catchDuration=2, dropDuration=5, debug=False) -> None:
 
         self.hubName = hubName 
         self.dropAngle = dropAngle
@@ -104,6 +102,11 @@ class Scooper:
                 print(csucc)
             self.pAngle = angle
 
+    def dump(self):
+        # TODO: needs to be implemented
+        self.setCatcherAngle(self.dropAngle)
+        time.sleep(self.dropDuration)
+
     
     class States(Enum):
         WAIT_TO_CATCH = auto
@@ -111,6 +114,3 @@ class Scooper:
         DRIVING_TO_DUMP = auto
         DUMPING = auto
         DRIVING_TO_CATCH = auto
-
-
-
