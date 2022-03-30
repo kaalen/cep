@@ -10,6 +10,8 @@ from threading import Thread, Lock, Condition
 
 
 class Sweeper(Scooper):
+    log_msg_prefix = "Sweeper: "
+    
     def __init__(self, end=50, dump=50):
         super().__init__()
 
