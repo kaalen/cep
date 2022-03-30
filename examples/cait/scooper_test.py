@@ -7,7 +7,8 @@ if __name__ == "__main__":
     while True:
         scooper.setCatcherAngle(scooper.catchAngle)
         time.sleep(2)
+        scooper.driveToDump()
         scooper.setCatcherAngle(scooper.dropAngle)
         time.sleep(2)
-
+        scooper.driveToCatch()
 
