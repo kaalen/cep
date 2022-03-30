@@ -5,15 +5,17 @@ import blobconverter
 import cv2
 import argparse
 import numpy as np
+import logging
 import time
 from depthai_sdk import Previews
 from depthai_sdk.managers import PipelineManager, PreviewManager, NNetManager
 import depthai as dai
 import trackable_object
+from sweeper import SweeperController
 
 PREVIEW_WIDTH = 300#960
 PREVIEW_HEIGHT = 300#540
-
+DISTANCE_THRESHOLD = 60
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -57,6 +59,7 @@ cam.setPreviewSize(PREVIEW_WIDTH, PREVIEW_HEIGHT)
 cam.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
 cam.setInterleaved(False)
 cam.setPreviewKeepAspectRatio(False)
+cam.setFps(15)
 
 # Define a neural network that will make predictions based on the source frames
 pm.addNn(nn)
@@ -102,14 +105,40 @@ def display_label_count(videoFrame, labelMap, labelCounter):
         if labelMap[i] != "":              
             cv2.putText(videoFrame, f'{labelMap[i]}: {labelCounter[i]}', (10, 60+(25*i)), font, 0.8, (0, 0, 255), 2, font)
 
+def move_robot(active_to, centroid, sweeper):
+    if active_to is not None:
+        cx = centroid[0]
+        screen_cx = 1920/2
+        diff_x = screen_cx - cx
+        distance_factor = 20
+        
+        if abs(diff_x) > DISTANCE_THRESHOLD:
+            logging.info(f"Tracklet {str(active_to.id)} centroid: {str(centroid[0])}, {str(centroid[1])}   diff_x: {str(diff_x)}")
+            # only move robot if not close enough (prevents jittery motion)
+            location = diff_x/distance_factor
+            direction = "right"
+            if cx < screen_cx:
+                # move right
+                location = -1 * location
+                direction = "left"
+
+            if sweeper.isBusy() == False:
+                logging.info(f"move {direction}: {str(location)}")
+                sweeper.goToLocation(location, True)
+                sweeper.setScoopUp()
+
+
 onCountObserve = []
 def alertOnCount(dir, newValue):
     for func in onCountObserve:
         func(dir, newValue)
 def subscribeOnCount(callback):
     onCountObserve.append(callback)
+
     
 def main():
+    logging.getLogger().setLevel(logging.INFO)
+
     with dai.Device(pm.pipeline) as device:
         pv = PreviewManager(display=[Previews.color.name])
 
@@ -118,6 +147,9 @@ def main():
         qPreview = device.getOutputQueue(name="preview", maxSize=4, blocking=False)
         qDet = device.getOutputQueue(name="nn", maxSize=4, blocking=False)
         tracklets = device.getOutputQueue("tracklets", 4, False)
+
+        sweeper = SweeperController()
+        sweeper.runSweeper()
 
         if args.save_path:
             width = 300
@@ -169,6 +201,9 @@ def main():
         cv2.resizeWindow("video", 1280, 720)
         print("Resize video window with mouse drag!")
 
+        active_to = None # Active tracked object - the one we're trying to capture
+        sweeper.setScoopUp()
+
         while should_run():
             # Get image frames from camera or video file
             read_correctly, frame = get_frame()
@@ -203,7 +238,10 @@ def main():
 
                 if track:
                     trackletsData = track.tracklets
-                    print(len(trackletsData))
+
+                    if len(trackletsData) == 0:
+                        active_to = None
+
                     for t in trackletsData:
                         to = trackableObjects.get(t.id, None)
 
@@ -263,6 +301,35 @@ def main():
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
                             cv2.circle(
                                 videoFrame, (centroid[0], centroid[1]), 4, (255, 255, 255), -1)
+
+                        if active_to is None:
+                            # Activate the first object
+                            active_to = t
+                        else:
+                            # check if active object lost or removed
+                            remove = False
+                            matching = [x for x in trackletsData if x.id == active_to.id]
+                            if len(matching) == 0:
+                                # if scoop is down, go and dump the object
+                                # goDumpObject(sweeper)
+                                logging.warning(f"**** no matching object for {str(active_to.id)}")
+                                remove = True
+                                # x.status == dai.Tracklet.TrackingStatus.LOST or 
+                            lost_or_removed = [x for x in trackletsData if x.status == dai.Tracklet.TrackingStatus.REMOVED]
+                            matching_lost_removed = [x for x in lost_or_removed if x.id == active_to.id]
+                            if len(matching_lost_removed) > 0:
+                                for x in matching_lost_removed:
+                                    status = "Lost" if x.status == dai.Tracklet.TrackingStatus.LOST else "Removed"
+                                    logging.warning(f"              {status}: {str(x.id)}")
+                                    remove = True
+                            if remove:
+                                active_to = None
+                                logging.warning(f"**** Removed object")
+                                sweeper.dumpAndReturn()
+            
+                # if active_to is not None and active_to.id == t.id:
+                       
+                move_robot(active_to, centroid, sweeper)
 
                 # Draw ROI line
                 if args.axis:
