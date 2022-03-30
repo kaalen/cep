@@ -1,18 +1,15 @@
+import logging
 from scooper import Scooper
-
 import time
-
 import cait.essentials
-
 from queue import Queue
 from threading import Thread, Lock, Condition
 
 # Class To Drive Robot To Provided Position Or Percent Between Start And End Point
-# Location, Start And End Are Defined As Duration * DrivePower Relative To Start 
+# Location, Start And End Are Defined As Duration * DrivePower Relative To Start
+
 
 class Sweeper(Scooper):
-
-
     def __init__(self, end=50, dump=50):
         super().__init__()
 
@@ -29,44 +26,38 @@ class Sweeper(Scooper):
         self.completingAction = False
 
         # Init Message
-        print('init sweeper')
-
+        logging.info(self.log_msg_prefix + "Init sweeper")
 
     # Run Thread Loop
     def run(self):
         while True:
             job = self.messages.get()
-            print(f'Description: {job.description}')
-            print(f'data: {job.data}')
+            logging.info(self.log_msg_prefix + f"Description: {job.description}")
+            logging.info(self.log_msg_prefix + f"data: {job.data}")
 
             self.busyLock.acquire()
             self.completingAction = True
             self.busyLock.release()
 
-
             if job.description == "dtd":
                 self.driveToDump()
-            elif job.description == 'dts':
+            elif job.description == "dts":
                 self.driveToStart()
-            elif job.description == 'gtl':
+            elif job.description == "gtl":
                 self.goToLocation(job.data)
-            elif job.description == 'gtp':
+            elif job.description == "gtp":
                 self.goToPercent(job.data)
-            elif job.description == 'ssu':
+            elif job.description == "ssu":
                 self.setScoopUp()
-            elif job.description == 'ssd':
+            elif job.description == "ssd":
                 self.setScoopDown()
-            elif job.description == 'sst':
+            elif job.description == "sst":
                 self.setScoopToggle()
 
             if self.messages.empty():
                 self.busyLock.acquire()
                 self.completingAction = False
                 self.busyLock.release()
-
-           
-
-
 
     # Move Functions ------
 
@@ -78,18 +69,21 @@ class Sweeper(Scooper):
     def driveToStart(self):
         self.goToLocation(self.start)
 
-
     # Go To Location Defined As Duration * self.drivePower
     def goToLocation(self, location):
+        logging.info("Sweeper goToLocation: "+str(location))
         distance = self.location - location
+        logging.info("Sweeper distance: "+str(distance))
         duration = abs(distance) / self.drivePower
-        power = distance > 0 if self.drivePower else -1 * self.drivePower
+        power = self.drivePower if distance > 0 else -1 * self.drivePower
 
-        succ, msg = cait.essentials.set_motor_power(self.hubName, 
-                                    self.motors["wheels"], power)
+        succ, msg = cait.essentials.set_motor_power(
+            self.hubName, self.motors["wheels"], power
+        )
         time.sleep(duration)
-        succ, msg = cait.essentials.set_motor_power(self.hubName,
-                                     self.motors["wheels"], 0)
+        succ, msg = cait.essentials.set_motor_power(
+            self.hubName, self.motors["wheels"], 0
+        )
 
         self.location = location
 
@@ -109,28 +103,28 @@ class Sweeper(Scooper):
         angle = self.dropAngle if self.dropAngle == self.pAngle else self.catchAngle
         self.setCatcherAngle(angle)
 
-class Job:
 
+class Job:
     def __init__(self, description, data=None):
         self.description = description
         self.data = data
 
 
 class SweeperController:
-    
+    log_msg_prefix = "SweeperController: "
+
     def __init__(self, end=50, dump=50):
 
         # Child Variables
         self.sweeper = Sweeper(end, dump)
         self.messages = self.sweeper.messages
 
-
         # Init Message
-        print('init controller')
+        logging.info(self.log_msg_prefix + "init controller")
 
     # Run Thread Loop
     def runSweeper(self):
-        Thread(target = self.sweeper.run).start()
+        Thread(target=self.sweeper.run).start()
 
     # Method To Clear Action Queue
     def clear(self):
@@ -153,20 +147,19 @@ class SweeperController:
 
     # Go To Location Defined As Duration * self.drivePower
     def goToLocation(self, location):
+        logging.info(self.log_msg_prefix + f"Go to location {str(location)}")
         self.messages.put(Job("gtl", location))
 
     # Go To Percent Along A Path, Where Start Is self.start,
     # End Is self.end
     def goToPercent(self, percentAlongPath):
-        self.messages.put(Job('gtp', percentAlongPath))
+        self.messages.put(Job("gtp", percentAlongPath))
 
     def setScoopUp(self):
         self.messages.put(Job("ssu"))
-
 
     def setScoopDown(self):
         self.messages.put(Job("ssd"))
 
     def setScoopToggle(self):
         self.messages.put(Job("sst"))
-
