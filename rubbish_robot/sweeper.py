@@ -34,8 +34,8 @@ class Sweeper(Scooper):
     def run(self):
         while True:
             job = self.messages.get()
-            logging.info(self.log_msg_prefix + f"Description: {job.description}")
-            logging.info(self.log_msg_prefix + f"data: {job.data}")
+            logging.debug(self.log_msg_prefix + f"Description: {job.description}")
+            logging.debug(self.log_msg_prefix + f"data: {job.data}")
 
             self.busyLock.acquire()
             self.completingAction = True
@@ -61,6 +61,9 @@ class Sweeper(Scooper):
                 self.completingAction = False
                 self.busyLock.release()
 
+            self.messages.task_done()
+
+
     # Move Functions ------
 
     # Function To Drive To Dump Location
@@ -73,11 +76,12 @@ class Sweeper(Scooper):
 
     # Go To Location Defined As Duration * self.drivePower
     def goToLocation(self, location):
-        logging.info("Sweeper goToLocation: "+str(location))
         distance = self.location - location
-        logging.info("Sweeper distance: "+str(distance))
+        if abs(distance) < 0.5:
+            return
         duration = abs(distance) / self.drivePower
         power = self.drivePower if distance > 0 else -1 * self.drivePower
+        logging.info(f"Sweeper goToLocation: {str(location)}, distance {str(distance)}")
 
         succ, msg = cait.essentials.set_motor_power(
             self.hubName, self.motors["wheels"], power
@@ -139,6 +143,13 @@ class SweeperController:
         self.sweeper.busyLock.release()
         return isBusy
 
+    def dumpAndReturn(self):
+        self.messages.put(Job("dtd"))
+        self.messages.put(Job("ssd"))
+        self.messages.put(Job("dts"))
+        self.messages.put(Job("ssu"))
+        time.sleep(5)
+
     # Function To Drive To Dump Location
     def driveToDump(self):
         self.messages.put(Job("dtd"))
@@ -148,9 +159,12 @@ class SweeperController:
         self.messages.put(Job("dts"))
 
     # Go To Location Defined As Duration * self.drivePower
-    def goToLocation(self, location):
-        logging.info(self.log_msg_prefix + f"Go to location {str(location)}")
-        self.messages.put(Job("gtl", location))
+    def goToLocation(self, location, skipIfBusy):
+        if skipIfBusy and self.isBusy() == False:
+                self.messages.put(Job("gtl", location))
+        else:
+            self.messages.put(Job("gtl", location))
+
 
     # Go To Percent Along A Path, Where Start Is self.start,
     # End Is self.end
