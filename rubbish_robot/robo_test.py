@@ -15,7 +15,12 @@ def main():
     time.sleep(3)
     print(sweeper.isBusy())
     while True:
-        continue
+        # continue
+        sweeper.setScoopUp()
+        sweeper.driveToDump()
+        sweeper.setScoopDown()
+        sweeper.driveToStart()
+        time.sleep(3)
 
 if __name__ == "__main__":
     main()
