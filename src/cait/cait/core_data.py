@@ -14,9 +14,9 @@ reset_all = False
 reset_in_progress = False
 
 # Font used in drawing
-ft = cv2.freetype.createFreeType2()
+# ft = cv2.freetype.createFreeType2()
 curt_path = os.getenv("CURT_PATH")
-ft.loadFontData(fontFileName=curt_path+"models/modules/vision/platforms/fonts/HelveticaNeue.ttf", id=0)
+# ft.loadFontData(fontFileName=curt_path+"models/modules/vision/platforms/fonts/HelveticaNeue.ttf", id=0)
 
 COLOR = [(0, 153, 0), (234, 187, 105), (80, 190, 168), (0, 0, 255)]
 EMOTION_COLORS = [
@@ -282,6 +282,7 @@ object_labels = [
     "teddy bear",
     "hair drier",
     "toothbrush",
+    "rubbish"
 ]
 
 OBJ_COLOR = [
