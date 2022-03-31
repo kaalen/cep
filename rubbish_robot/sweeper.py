@@ -10,7 +10,10 @@ from threading import Thread, Lock, Condition
 
 
 class Sweeper(Scooper):
+
+
     log_msg_prefix = "Sweeper: "
+
     
     def __init__(self, end=50, dump=50):
         super().__init__()
@@ -151,10 +154,10 @@ class SweeperController:
         return isBusy
 
     def dumpAndReturn(self):
-        self.messages.put(Job("dtd"))
-        self.messages.put(Job("ssd"))
-        self.messages.put(Job("dts"))
-        self.messages.put(Job("ssu"))
+        self.driveToDump()
+        self.setScoopDown()
+        self.driveToStart()
+        self.setScoopUp()
         time.sleep(5)
 
     # Function To Drive To Dump Location
