@@ -21,6 +21,9 @@ class Sweeper(Scooper):
         self.end = end
         self.dumpLoc = dump
 
+        # Limit Vars
+        self.minDistance = 0.5
+
         # Sync Vars
         self.messages = Queue()
         self.busyLock = Lock()
@@ -76,8 +79,12 @@ class Sweeper(Scooper):
 
     # Go To Location Defined As Duration * self.drivePower
     def goToLocation(self, location):
+
+        # Calculate Distance
         distance = self.location - location
-        if abs(distance) < 0.5:
+
+        # Check If Greater Than Min Distance
+        if abs(distance) < self.minDistance:
             return
         duration = abs(distance) / self.drivePower
         power = self.drivePower if distance > 0 else -1 * self.drivePower
