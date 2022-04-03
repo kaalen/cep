@@ -169,17 +169,17 @@ class DeviceManager:
                 if mac_addr != None:
                     addr = mac_addr.group(1)
                     device_name = ""
-                    logging.info("Device mac address:" + str(addr))
+                    logging.debug("Device mac address:" + str(addr))
                     try:
                         cmd = ["hcitool", "name", addr]
-                        logging.info(str(cmd))
+                        logging.debug(str(cmd))
                         out, err = subprocess.Popen(
                             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
                         ).communicate()
                         device_name = out.decode("utf-8").split("\n")[0]
-                        logging.info("Control device Out: " + str(out))
-                        logging.info("Control device Err: " + str(err))
-                        logging.info("***************************")
+                        logging.debug("Control device Out: " + str(out))
+                        logging.debug("Control device Err: " + str(err))
+                        logging.debug("***************************")
                     except:
                         pass
                     if device_name.find("ev3") != -1:
