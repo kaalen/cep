@@ -31,6 +31,7 @@ class RubbishTracker():
         self.roi_position = roi_position
         self.save_path = save_path
         self.activate_robot = activate_robot
+        self.show_axis_count = False
 
         self.sweeper = None
 
@@ -104,6 +105,55 @@ class RubbishTracker():
             if self.labelMap[i] != "":              
                 cv2.putText(videoFrame, f'{self.labelMap[i]}: {labelCounter[i]}', (10, 60+(25*i)), font, 0.8, (0, 0, 255), 2, font)
 
+    def perfom_axis_count(self, to, centroid, width, height):
+        """
+        Args:
+            width - frame width
+            height - frame height"""
+        if self.axis and not to.counted:
+            x = [c[0] for c in to.centroids]
+            direction = centroid[0] - np.mean(x)
+
+            if centroid[0] > self.roi_position*width and direction > 0 and np.mean(x) < self.roi_position*width:
+                self.counter[1] += 1 #left
+                self.labelCounter[to.label] += 1
+                to.counted = True
+                self.alertOnCount("left", self.labelCounter[to.label])
+
+            elif centroid[0] < self.roi_position*width and direction < 0 and np.mean(x) > self.roi_position*width:
+                self.counter[0] += 1 #right
+                self.labelCounter[to.label] += 1
+                to.counted = True
+                self.alertOnCount("right", self.labelCounter[to.label])
+
+        elif not self.axis and not to.counted:
+            y = [c[1] for c in to.centroids]
+            direction = centroid[1] - np.mean(y)
+
+            if centroid[1] > self.roi_position*height and direction > 0 and np.mean(y) < self.roi_position*height:
+                self.counter[3] += 1 #down
+                self.labelCounter[to.label] += 1
+                to.counted = True
+                self.alertOnCount("down", self.labelCounter[to.label])
+
+            elif centroid[1] < self.roi_position*height and direction < 0 and np.mean(y) > self.roi_position*height:
+                self.counter[2] += 1 #up
+                self.labelCounter[to.label] += 1
+                to.counted = True
+                self.alertOnCount("up", self.labelCounter[to.label])
+
+
+    def display_axis_count(self, videoFrame):
+        if self.show_axis_count == False:
+            return
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        if self.axis:
+            cv2.putText(videoFrame, f'Left: {self.counter[0]}; Right: {self.counter[1]}', (
+                10, 35), font, 0.8, (0, 0xFF, 0xFF), 2, cv2.FONT_HERSHEY_SIMPLEX)
+        else:
+            cv2.putText(videoFrame, f'Up: {self.counter[2]}; Down: {self.counter[3]}', (
+                10, 35), font, 0.8, (0, 0xFF, 0xFF), 2, cv2.FONT_HERSHEY_SIMPLEX)
+
     def move_robot(self, active_to, centroid):
         if self.sweeper is None:
             return
@@ -111,23 +161,24 @@ class RubbishTracker():
         if active_to is not None:
             cx = centroid[0]
             screen_cx = 1920/2
-            diff_x = screen_cx - cx
+            diff_x = cx - screen_cx
             distance_factor = 20
             
-            if abs(diff_x) > self.DISTANCE_THRESHOLD:
-                logging.info(f"Tracklet {str(active_to.id)} centroid: {str(centroid[0])}, {str(centroid[1])}   diff_x: {str(diff_x)}")
+            if abs(diff_x) > self.DISTANCE_THRESHOLD and self.sweeper.isBusy() == False:
                 # only move robot if not close enough (prevents jittery motion)
-                location = diff_x/distance_factor
-                direction = "right"
-                if cx < screen_cx:
+                distance = diff_x/distance_factor
+                if abs(distance) < 5:
+                    return
+                logging.info(f"Tracklet {str(active_to.id)} centroid: {str(centroid[0])}, {str(centroid[1])}   diff_x: {str(diff_x)}")
+                direction = "left"
+                if diff_x > 0:
                     # move right
-                    location = -1 * location
-                    direction = "left"
+                    # distance = -1 * distance
+                    direction = "right"
 
-                if self.sweeper.isBusy() == False:
-                    logging.info(f"move {direction}: {str(location)}")
-                    self.sweeper.goToLocation(location, True)
-                    self.sweeper.setScoopUp()
+                logging.info(f"move {direction}: {str(distance)}")
+                self.sweeper.moveDistance(distance, True)
+                self.sweeper.setScoopUp()
 
 
     def alertOnCount(self, dir, newValue):
@@ -137,6 +188,14 @@ class RubbishTracker():
     def subscribeOnCount(self, callback):
         self.onCountObserve.append(callback)
     
+    def get_frame(self):
+        inVideo = self.qVideo.get()
+        frame = inVideo.getCvFrame()
+        return True, frame
+
+    def should_run(self):
+        return True
+
     def run(self):
 
         with dai.Device(self.pm.pipeline) as device:
@@ -160,21 +219,13 @@ class RubbishTracker():
                 out = cv2.VideoWriter(self.save_path, cv2.VideoWriter_fourcc(
                     'M', 'J', 'P', 'G'), fps, (width, height))
 
-            def should_run():
-                return True
-
-            def get_frame():
-                inVideo = qVideo.get()
-                frame = inVideo.getCvFrame()
-                return True, frame
-
             startTime = time.monotonic()
             detections = []
             previewFrame = None
             videoFrame = None
         
             frame_count = 0
-            counter = [0, 0, 0, 0]  # left, right, up, down
+            self.counter = [0, 0, 0, 0]  # left, right, up, down
             labelCounter = [0] * len(self.labelMap)
 
             trackableObjects = {}
@@ -188,9 +239,9 @@ class RubbishTracker():
             if self.sweeper is not None:
                 self.sweeper.setScoopUp()
 
-            while should_run():
+            while self.should_run():
                 # Get image frames from camera or video file
-                read_correctly, frame = get_frame()
+                read_correctly, frame = self.get_frame()
                 if not read_correctly:
                     break
 
@@ -231,61 +282,19 @@ class RubbishTracker():
                             to = trackableObjects.get(t.id, None)
 
                             # calculate centroid
-                            roi = t.roi.denormalize(width, height)
-                            x1 = int(roi.topLeft().x)
-                            y1 = int(roi.topLeft().y)
-                            x2 = int(roi.bottomRight().x)
-                            y2 = int(roi.bottomRight().y)
-                            centroid = (int((x2-x1)/2+x1), int((y2-y1)/2+y1))
+                            centroid = RubbishTracker.calculateCentroid(t, width, height)
 
                             # If new tracklet, save its centroid
                             if t.status == dai.Tracklet.TrackingStatus.NEW:
                                 to = trackable_object.TrackableObject(t.id, centroid, t.label)
                             elif to is not None:
-                                if self.axis and not to.counted:
-                                    x = [c[0] for c in to.centroids]
-                                    direction = centroid[0] - np.mean(x)
-
-                                    if centroid[0] > self.roi_position*width and direction > 0 and np.mean(x) < self.roi_position*width:
-                                        counter[1] += 1 #left
-                                        labelCounter[to.label] += 1
-                                        to.counted = True
-                                        self.alertOnCount("left", labelCounter[to.label])
-        
-                                    elif centroid[0] < self.roi_position*width and direction < 0 and np.mean(x) > self.roi_position*width:
-                                        counter[0] += 1 #right
-                                        labelCounter[to.label] += 1
-                                        to.counted = True
-                                        self.alertOnCount("right", labelCounter[to.label])
-
-
-                                elif not self.axis and not to.counted:
-                                    y = [c[1] for c in to.centroids]
-                                    direction = centroid[1] - np.mean(y)
-
-                                    if centroid[1] > self.roi_position*height and direction > 0 and np.mean(y) < self.roi_position*height:
-                                        counter[3] += 1 #down
-                                        labelCounter[to.label] += 1
-                                        to.counted = True
-                                        self.alertOnCount("down", labelCounter[to.label])
-
-                                    elif centroid[1] < self.roi_position*height and direction < 0 and np.mean(y) > self.roi_position*height:
-                                        counter[2] += 1 #up
-                                        labelCounter[to.label] += 1
-                                        to.counted = True
-                                        self.alertOnCount("up", labelCounter[to.label])
-
+                                self.perfom_axis_count(to, centroid, width, height)
 
                                 to.centroids.append(centroid)
 
                             trackableObjects[t.id] = to
 
-                            if t.status != dai.Tracklet.TrackingStatus.LOST and t.status != dai.Tracklet.TrackingStatus.REMOVED:
-                                text = "ID {}".format(t.id)
-                                cv2.putText(videoFrame, text, (centroid[0] - 10, centroid[1] - 10),
-                                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-                                cv2.circle(
-                                    videoFrame, (centroid[0], centroid[1]), 4, (255, 255, 255), -1)
+                            RubbishTracker.drawTrackletCentroid(t, videoFrame, centroid)
 
                             if active_to is None:
                                 # Activate the first object
@@ -293,13 +302,13 @@ class RubbishTracker():
                             else:
                                 # check if active object lost or removed
                                 remove = False
+                                dump = False
                                 matching = [x for x in trackletsData if x.id == active_to.id]
                                 if len(matching) == 0:
                                     # if scoop is down, go and dump the object
                                     # goDumpObject(sweeper)
                                     logging.warning(f"**** no matching object for {str(active_to.id)}")
                                     remove = True
-                                    # x.status == dai.Tracklet.TrackingStatus.LOST or 
                                 lost_or_removed = [x for x in trackletsData if x.status == dai.Tracklet.TrackingStatus.REMOVED]
                                 matching_lost_removed = [x for x in lost_or_removed if x.id == active_to.id]
                                 if len(matching_lost_removed) > 0:
@@ -307,11 +316,16 @@ class RubbishTracker():
                                         status = "Lost" if x.status == dai.Tracklet.TrackingStatus.LOST else "Removed"
                                         logging.warning(f"              {status}: {str(x.id)}")
                                         remove = True
+                                        if x.roi.y > 0.8:
+                                            dump = True
                                 if remove:
-                                    active_to = None
                                     logging.warning(f"**** Removed object")
-                                    if self.sweeper is not None: 
-                                        self.sweeper.dumpAndReturn()
+                                    if dump:
+                                        logging.warning(f"**** dump object {active_to.id}")
+                                        if self.sweeper is not None: 
+                                            self.sweeper.dumpAndReturn()
+                                            # pass
+                                    active_to = None
                 
                         # if active_to is not None and active_to.id == t.id:
                             
@@ -326,15 +340,10 @@ class RubbishTracker():
                                 (width, int(self.roi_position*height)), (0xFF, 0, 0), 5)
 
                     # display count and status
-                    font = cv2.FONT_HERSHEY_SIMPLEX
-                    if self.axis:
-                        cv2.putText(videoFrame, f'Left: {counter[0]}; Right: {counter[1]}', (
-                            10, 35), font, 0.8, (0, 0xFF, 0xFF), 2, cv2.FONT_HERSHEY_SIMPLEX)
-                    else:
-                        cv2.putText(videoFrame, f'Up: {counter[2]}; Down: {counter[3]}', (
-                            10, 35), font, 0.8, (0, 0xFF, 0xFF), 2, cv2.FONT_HERSHEY_SIMPLEX)
+                    self.display_axis_count(videoFrame)
 
                     self.display_label_count(videoFrame, labelCounter)
+
 
 
                     if self.show:
@@ -381,6 +390,25 @@ class RubbishTracker():
             cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
         # Show the frame
         cv2.imshow(name, frame)
+  
+    @staticmethod
+    def drawTrackletCentroid(tracklet, videoFrame, centroid):
+        if tracklet.status != dai.Tracklet.TrackingStatus.LOST and tracklet.status != dai.Tracklet.TrackingStatus.REMOVED:
+            text = "ID {}".format(tracklet.id)
+            cv2.putText(videoFrame, text, (centroid[0] - 10, centroid[1] - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            cv2.circle(
+                videoFrame, (centroid[0], centroid[1]), 4, (255, 255, 255), -1)
+
+    @staticmethod
+    def calculateCentroid(tracklet, width, height):
+        roi = tracklet.roi.denormalize(width, height)
+        x1 = int(roi.topLeft().x)
+        y1 = int(roi.topLeft().y)
+        x2 = int(roi.bottomRight().x)
+        y2 = int(roi.bottomRight().y)
+        centroid = (int((x2-x1)/2+x1), int((y2-y1)/2+y1))
+        return centroid
 
 def main():
     logging.getLogger().setLevel(logging.INFO)
@@ -407,7 +435,7 @@ def main():
         model=args.model,
         show=args.show,
         axis=args.axis,
-        roi_position=args.roi_position,
+        roi_position=0.8, #args.roi_position
         save_path=args.save_path,
         activate_robot=True
     )
