@@ -10,7 +10,10 @@ from threading import Thread, Lock, Condition
 
 
 class Sweeper(Scooper):
+
+
     log_msg_prefix = "Sweeper: "
+
     
     def __init__(self, end=50, dump=50):
         super().__init__()
@@ -20,6 +23,9 @@ class Sweeper(Scooper):
         self.start = 0
         self.end = end
         self.dumpLoc = dump
+
+        # Limit Vars
+        self.minDistance = 0.5
 
         # Sync Vars
         self.messages = Queue()
@@ -84,7 +90,13 @@ class Sweeper(Scooper):
 
     # Go To Location Defined As Duration * self.drivePower
     def goToLocation(self, location):
+
+        # Calculate Distance
         distance = self.location - location
+
+        # Check If Greater Than Min Distance
+        if abs(distance) < self.minDistance:
+            return
         duration = abs(distance) / self.drivePower
         power = self.drivePower if distance > 0 else -1 * self.drivePower
         logging.info(f"Sweeper goToLocation: {str(location)}, distance {str(distance)}")
@@ -173,10 +185,10 @@ class SweeperController:
         return isBusy
 
     def dumpAndReturn(self):
-        self.messages.put(Job("dtd"))
-        self.messages.put(Job("ssd"))
-        self.messages.put(Job("dts"))
-        self.messages.put(Job("ssu"))
+        self.driveToDump()
+        self.setScoopDown()
+        self.driveToStart()
+        self.setScoopUp()
         time.sleep(5)
 
     # Function To Drive To Dump Location
