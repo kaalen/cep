@@ -11,6 +11,7 @@ from threading import Thread, Lock, Condition
 
 class Sweeper(Scooper):
     log_msg_prefix = "Sweeper: "
+    stop = False
     
     def __init__(self, end=50, dump=50):
         super().__init__()
@@ -32,7 +33,7 @@ class Sweeper(Scooper):
 
     # Run Thread Loop
     def run(self):
-        while True:
+        while self.stop == False:
             job = self.messages.get()
             logging.debug(self.log_msg_prefix + f"Description: {job.description}")
             logging.debug(self.log_msg_prefix + f"data: {job.data}")
@@ -63,6 +64,8 @@ class Sweeper(Scooper):
 
             self.messages.task_done()
 
+    def stop(self):
+        self.stop = True
 
     # Move Functions ------
 
@@ -131,6 +134,9 @@ class SweeperController:
     # Run Thread Loop
     def runSweeper(self):
         Thread(target=self.sweeper.run).start()
+
+    def stopSweeper(self):
+        self.sweeper.stop()
 
     # Method To Clear Action Queue
     def clear(self):
