@@ -30,7 +30,7 @@ class RobotInventorControl(BaseControl):
             logging.warning("Connecting to: " + str(port) + ", " + str(host))
             self.connection.connect((host, port))
             time.sleep(1)
-            self.connection.settimeout(5)
+            self.connection.settimeout(15)
             self.connection.send(b"\x03")
             self.connection.send(b"import hub\x0D")
             #if not self.face_showed:
@@ -38,7 +38,7 @@ class RobotInventorControl(BaseControl):
             #self.connection.send(b"hub.display.rotation(-90)\x0D")
             #self.face_showed = True
             time.sleep(0.5)
-            dump = self.connection.recv(102400)
+            data = self.connection.recv(102400)
             time.sleep(0.5)
             self.current_hub_address = hub_address
             return True
@@ -233,3 +233,38 @@ class RobotInventorControl(BaseControl):
             msg = b'hub.sound.play("where.spike.bin")\x0D'
             self.connection.send(msg)
             time.sleep(0.1)
+
+    def setPowerdownTimeout(self, timeout):
+        cmd = "hub.config[\"powerdown_timeout\"] = "+str(timeout)+"\x0D"
+        self.connection.sendall(cmd)
+        time.sleep(0.1)
+
+    def getConfig(self):
+        cmd = "print(hub.config)\x0D"
+        self.connection.sendall(cmd)
+        time.sleep(0.5)
+        data = self.connection.recv(1024)
+        result = ""
+        if len(data) > len(cmd):
+            result = data.decode().replace(cmd,"").replace("\r\n>>> ","")
+        return result
+
+    def getVersion(self):
+        cmd = "hub.__version__\x0D"
+        self.connection.sendall(cmd)
+        time.sleep(0.1)
+        data = self.connection.recv(1024)
+        result = ""
+        if len(data) > len(cmd):
+            result = data.decode().replace(cmd,"").replace("\r\n>>> ","")
+        return result
+
+    def getStatus(self):
+        cmd = "hub.status()\x0D"
+        self.connection.sendall(cmd)
+        time.sleep(0.1)
+        data = self.connection.recv(1024)
+        result = ""
+        if len(data) > len(cmd):
+            result = data.decode().replace(cmd, "").replace("\r\n>>> ","")
+        return result
