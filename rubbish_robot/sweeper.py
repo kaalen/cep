@@ -1,7 +1,7 @@
 import logging
 from scooper import Scooper
 import time
-import cait.essentials
+# import cait.essentials
 from queue import Queue
 from threading import Thread, Lock, Condition
 
@@ -11,7 +11,6 @@ from threading import Thread, Lock, Condition
 
 class Sweeper(Scooper):
     log_msg_prefix = "Sweeper: "
-    stop = False
     
     def __init__(self, end=50, dump=50):
         super().__init__()
@@ -33,7 +32,8 @@ class Sweeper(Scooper):
 
     # Run Thread Loop
     def run(self):
-        while self.stop == False:
+        self.shouldRun = True
+        while self.shouldRun:
             job = self.messages.get()
             logging.debug(self.log_msg_prefix + f"Description: {job.description}")
             logging.debug(self.log_msg_prefix + f"data: {job.data}")
@@ -56,6 +56,8 @@ class Sweeper(Scooper):
                 self.setScoopDown()
             elif job.description == "sst":
                 self.setScoopToggle()
+            elif job.description == "movedistance":
+                self.moveDistance(job.data)
 
             if self.messages.empty():
                 self.busyLock.acquire()
@@ -65,7 +67,10 @@ class Sweeper(Scooper):
             self.messages.task_done()
 
     def stop(self):
-        self.stop = True
+        self.shouldRun = False
+
+    def getLocation(self):
+        return self.location
 
     # Move Functions ------
 
@@ -80,21 +85,39 @@ class Sweeper(Scooper):
     # Go To Location Defined As Duration * self.drivePower
     def goToLocation(self, location):
         distance = self.location - location
-        if abs(distance) < 0.5:
-            return
         duration = abs(distance) / self.drivePower
         power = self.drivePower if distance > 0 else -1 * self.drivePower
         logging.info(f"Sweeper goToLocation: {str(location)}, distance {str(distance)}")
 
-        succ, msg = cait.essentials.set_motor_power(
-            self.hubName, self.motors["wheels"], power
+        self.set_motor_power(
+            self.motors["wheels"], power
         )
         time.sleep(duration)
-        succ, msg = cait.essentials.set_motor_power(
-            self.hubName, self.motors["wheels"], 0
+        self.set_motor_power(
+            self.motors["wheels"], 0
         )
 
         self.location = location
+        logging.info(f"Sweeper position: {str(self.location)}")
+
+    def moveDistance(self, distance):
+        duration = abs(distance) / self.drivePower
+        power = self.drivePower if distance > 0 else -1 * self.drivePower
+        logging.info(f"Sweeper move distance: {str(distance)}")
+
+        # succ, msg = cait.essentials.set_motor_power(
+        #     self.hubName, self.motors["wheels"], power
+        # )
+        self.set_motor_power(
+            self.motors["wheels"], power
+        )
+        time.sleep(duration)
+        self.set_motor_power(
+            self.motors["wheels"], 0
+        )
+
+        self.location = self.location + distance
+        logging.info(f"Sweeper position: {str(self.location)}")
 
     # Go To Percent Along A Path, Where Start Is self.start,
     # End Is self.end
@@ -166,9 +189,7 @@ class SweeperController:
 
     # Go To Location Defined As Duration * self.drivePower
     def goToLocation(self, location, skipIfBusy):
-        if skipIfBusy and self.isBusy() == False:
-                self.messages.put(Job("gtl", location))
-        else:
+        if skipIfBusy == False or self.isBusy() == False:
             self.messages.put(Job("gtl", location))
 
 
@@ -176,6 +197,10 @@ class SweeperController:
     # End Is self.end
     def goToPercent(self, percentAlongPath):
         self.messages.put(Job("gtp", percentAlongPath))
+
+    def moveDistance(self, distance, skipIfBusy):
+        if skipIfBusy == False or self.isBusy() == False:
+            self.messages.put(Job("movedistance", distance))
 
     def setScoopUp(self):
         self.messages.put(Job("ssu"))
@@ -185,3 +210,6 @@ class SweeperController:
 
     def setScoopToggle(self):
         self.messages.put(Job("sst"))
+
+    def getLocation(self):
+        return self.sweeper.getLocation()

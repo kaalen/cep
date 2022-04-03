@@ -1,25 +1,24 @@
 # Class For Performing Scoop Actions
-
-
 import tkinter as tk
 import threading, queue
 from threading import Lock
 import time
 from numpy import datetime64
-import cait.essentials
+# import cait.essentials
 from datetime import datetime
 from enum import Enum, auto
-
+from curt.modules.control.robot_inventor_control import RobotInventorControl
 
 
 class Scooper:
     # Default Hub Name
     lego_hub_name = "Robot Inventor: A8:E2:C1:95:22:45"
-    motors = {"wheels" : "motor_B",
-    "scoop" : "motor_D",
-    "cam" : "motor_F"}
-   
-
+    hub_address = "A8:E2:C1:95:22:45"
+    motors = {
+        "wheels" : "motor_B",
+        "scoop" : "motor_D",
+        "cam" : "motor_F"
+    }
 
     def __init__(self, hubName=lego_hub_name,
      dropAngle=-159, catchAngle=-130,
@@ -45,9 +44,21 @@ class Scooper:
         self.initHub()
     
     def initHub(self):
-        succ, msg = cait.essentials.initialize_component('control', [self.hubName])
+        self.robot = RobotInventorControl()
+        success = self.robot.config_control_handler({
+            "hub_address": self.hub_address
+        })
+        self.robot.display({
+            "display_type": "image",
+            "image": "Happy"
+        })
+
+        # succ, msg = cait.essentials.initialize_component('control', [self.hubName])
         if self.debug:
-            print(str(succ) + " " + msg)
+            # print(str(succ) + " " + msg)
+            print("LEGO hub connection successful")
+        else:
+            print("****** LEGO hub could not connect")
 
 
     def begin(self):
@@ -84,20 +95,44 @@ class Scooper:
         time.sleep(self.catchDuration)
 
     def driveToDump(self):
-        succ, msg = cait.essentials.set_motor_power(self.hubName, self.motors["wheels"], self.drivePower)
+        # succ, msg = cait.essentials.set_motor_power(self.hubName, self.motors["wheels"], self.drivePower)
+        self.set_motor_power(self.motors["wheels"], self.drivePower)
         time.sleep(self.driveDuration)
-        succ, msg = cait.essentials.set_motor_power(self.hubName, self.motors["wheels"], 0)
+        # succ, msg = cait.essentials.set_motor_power(self.hubName, self.motors["wheels"], 0)
+        self.set_motor_power(self.motors["wheels"], 0)
     
     def driveToCatch(self):
-        succ, msg = cait.essentials.set_motor_power(self.hubName, self.motors["wheels"], self.drivePower * -1)
+        # succ, msg = cait.essentials.set_motor_power(self.hubName, self.motors["wheels"], self.drivePower * -1)
+        # time.sleep(self.driveDuration)
+        # succ, msg = cait.essentials.set_motor_power(self.hubName, self.motors["wheels"], 0)
+        self.set_motor_power(self.motors["wheels"], self.drivePower * -1)
         time.sleep(self.driveDuration)
-        succ, msg = cait.essentials.set_motor_power(self.hubName, self.motors["wheels"], 0)
+        self.set_motor_power(self.motors["wheels"], 0)
 
+    def set_motor_power(self, motor, power):
+        control_params = {
+                "motor_arrangement": "individual",
+                "motor": motor[-1],
+                "motion": "speed",
+                "speed": int(power),
+            }
+        return self.robot.control_motor(control_params)
+
+    def set_motor_position(self, motor, position):
+        control_params = {
+            "motor_arrangement": "individual",
+            "motor": motor[-1],
+            "motion": "rotate_to_position",
+            "position": int(position),
+            "speed": 70,
+        }
+        return self.robot.control_motor(control_params)
 
     
     def setCatcherAngle(self, angle):
         if angle != self.pAngle:
-            csucc = cait.essentials.set_motor_position(self.hubName, self.motors["scoop"], angle)
+            # csucc = cait.essentials.set_motor_position(self.hubName, self.motors["scoop"], angle)
+            csucc = self.set_motor_position(self.motors["scoop"], angle)
             if self.debug:
                 print(csucc)
             self.pAngle = angle
