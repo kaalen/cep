@@ -179,24 +179,6 @@ class RubbishTracker():
 
             trackableObjects = {}
 
-            def to_planar(arr: np.ndarray, shape: tuple) -> np.ndarray:
-                return cv2.resize(arr, shape).transpose(2, 0, 1).flatten()
-
-            # nn data, being the bounding box locations, are in <0..1> range - they need to be normalized with frame width/height
-            def frameNorm(frame, bbox):
-                normVals = np.full(len(bbox), frame.shape[0])
-                normVals[::2] = frame.shape[1]
-                return (np.clip(np.array(bbox), 0, 1) * normVals).astype(int)
-
-            def displayFrame(name, frame):
-                color = (255, 0, 0)
-                for detection in detections:
-                    bbox = frameNorm(frame, (detection.xmin, detection.ymin, detection.xmax, detection.ymax))
-                    cv2.putText(frame, self.labelMap[detection.label], (bbox[0] + 10, bbox[1] + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
-                    cv2.putText(frame, f"{int(detection.confidence * 100)}%", (bbox[0] + 10, bbox[1] + 40), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
-                    cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
-                # Show the frame
-                cv2.imshow(name, frame)
 
             cv2.namedWindow("video", cv2.WINDOW_NORMAL)
             cv2.resizeWindow("video", 1280, 720)
@@ -357,7 +339,7 @@ class RubbishTracker():
 
                     if self.show:
                         if videoFrame is not None:
-                            displayFrame("video", videoFrame)
+                            RubbishTracker.displayFrame("video", videoFrame, detections)
 
                         # if previewFrame is not None:
                         #     displayFrame("preview", previewFrame)
@@ -366,6 +348,7 @@ class RubbishTracker():
                         out.write(videoFrame)
 
                 if cv2.waitKey(1) == ord('q'):
+                    self.sweeper.stopSweeper()
                     break
 
 
@@ -373,6 +356,31 @@ class RubbishTracker():
 
             if self.save_path:
                 out.release()
+
+    @staticmethod
+    def to_planar(arr: np.ndarray, shape: tuple) -> np.ndarray:
+        return cv2.resize(arr, shape).transpose(2, 0, 1).flatten()
+
+    @staticmethod
+    def frameNorm(frame, bbox):
+        """ nn data, being the bounding box locations, are in <0..1> range - they need to be normalized with frame width/height
+        """
+        normVals = np.full(len(bbox), frame.shape[0])
+        normVals[::2] = frame.shape[1]
+        return (np.clip(np.array(bbox), 0, 1) * normVals).astype(int)
+
+    @staticmethod
+    def displayFrame(name, frame, detections):
+        """ Displays bounding box with object label and confidence
+        """
+        color = (255, 0, 0)
+        for detection in detections:
+            bbox = RubbishTracker.frameNorm(frame, (detection.xmin, detection.ymin, detection.xmax, detection.ymax))
+            cv2.putText(frame, RubbishTracker.labelMap[detection.label], (bbox[0] + 10, bbox[1] + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
+            cv2.putText(frame, f"{int(detection.confidence * 100)}%", (bbox[0] + 10, bbox[1] + 40), cv2.FONT_HERSHEY_TRIPLEX, 0.5, color)
+            cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
+        # Show the frame
+        cv2.imshow(name, frame)
 
 def main():
     logging.getLogger().setLevel(logging.INFO)
@@ -401,7 +409,7 @@ def main():
         axis=args.axis,
         roi_position=args.roi_position,
         save_path=args.save_path,
-        activate_robot=False
+        activate_robot=True
     )
     app.run()
 
