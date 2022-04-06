@@ -10,10 +10,7 @@ from threading import Thread, Lock, Condition
 
 
 class Sweeper(Scooper):
-
-
     log_msg_prefix = "Sweeper: "
-
     
     def __init__(self, end=50, dump=50):
         super().__init__()
@@ -38,39 +35,43 @@ class Sweeper(Scooper):
 
     # Run Thread Loop
     def run(self):
-        self.shouldRun = True
-        while self.shouldRun:
-            job = self.messages.get()
-            logging.debug(self.log_msg_prefix + f"Description: {job.description}")
-            logging.debug(self.log_msg_prefix + f"data: {job.data}")
+        try:
+            self.shouldRun = True
+            while self.shouldRun:
+                job = self.messages.get()
+                logging.debug(self.log_msg_prefix + f"Description: {job.description}")
+                logging.debug(self.log_msg_prefix + f"data: {job.data}")
 
-            self.busyLock.acquire()
-            self.completingAction = True
-            self.busyLock.release()
-
-            if job.description == "dtd":
-                self.driveToDump()
-            elif job.description == "dts":
-                self.driveToStart()
-            elif job.description == "gtl":
-                self.goToLocation(job.data)
-            elif job.description == "gtp":
-                self.goToPercent(job.data)
-            elif job.description == "ssu":
-                self.setScoopUp()
-            elif job.description == "ssd":
-                self.setScoopDown()
-            elif job.description == "sst":
-                self.setScoopToggle()
-            elif job.description == "movedistance":
-                self.moveDistance(job.data)
-
-            if self.messages.empty():
                 self.busyLock.acquire()
-                self.completingAction = False
+                self.completingAction = True
                 self.busyLock.release()
 
-            self.messages.task_done()
+                if job.description == "dtd":
+                    self.driveToDump()
+                elif job.description == "dts":
+                    self.driveToStart()
+                elif job.description == "gtl":
+                    self.goToLocation(job.data)
+                elif job.description == "gtp":
+                    self.goToPercent(job.data)
+                elif job.description == "ssu":
+                    self.setScoopUp()
+                elif job.description == "ssd":
+                    self.setScoopDown()
+                elif job.description == "sst":
+                    self.setScoopToggle()
+                elif job.description == "movedistance":
+                    self.moveDistance(job.data)
+
+                if self.messages.empty():
+                    self.busyLock.acquire()
+                    self.completingAction = False
+                    self.busyLock.release()
+
+                self.messages.task_done()
+        except BaseException as err:
+            print(f"Unexpected {err=}, {type(err)=}")
+            raise
 
     def stop(self):
         self.shouldRun = False
@@ -185,11 +186,12 @@ class SweeperController:
         return isBusy
 
     def dumpAndReturn(self):
-        self.driveToDump()
+        # self.driveToDump()
+        self.moveDistance(-50, False)
         self.setScoopDown()
-        self.driveToStart()
+        # self.moveDistance(20, False)
         self.setScoopUp()
-        time.sleep(5)
+        time.sleep(0.5)
 
     # Function To Drive To Dump Location
     def driveToDump(self):

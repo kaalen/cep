@@ -34,6 +34,7 @@ class RubbishTracker():
         self.show_axis_count = False
 
         self.sweeper = None
+        self.labelCounter = [0 for i in range(len(self.labelMap))] 
 
         # Create pipeline
         self.pm = PipelineManager()
@@ -93,17 +94,16 @@ class RubbishTracker():
         cam.setFps(15)
         return cam
 
-    def display_label_count(self, videoFrame, labelCounter):
+    def display_label_count(self, videoFrame):
         """Displays label counter for tracked object on the video frame
 
             Args:
             videoFrame: video frame on which to display count
-            labelCounter: int array of counters for each label
         """
         font = cv2.FONT_HERSHEY_SIMPLEX
-        for i in range(len(labelCounter)):  
+        for i in range(len(self.labelCounter)):  
             if self.labelMap[i] != "":              
-                cv2.putText(videoFrame, f'{self.labelMap[i]}: {labelCounter[i]}', (10, 60+(25*i)), font, 0.8, (0, 0, 255), 2, font)
+                cv2.putText(videoFrame, f'{self.labelMap[i]}: {self.labelCounter[i]}', (10, 60+(25*i)), font, 0.8, (0, 0, 255), 2, font)
 
     def perfom_axis_count(self, to, centroid, width, height):
         """
@@ -202,7 +202,7 @@ class RubbishTracker():
             pv = PreviewManager(display=[Previews.color.name])
 
             # Output queues will be used to get the frames and nn data from the outputs defined above
-            qVideo = device.getOutputQueue(name="video", maxSize=4, blocking=False)
+            self.qVideo = device.getOutputQueue(name="video", maxSize=4, blocking=False)
             qPreview = device.getOutputQueue(name="preview", maxSize=4, blocking=False)
             qDet = device.getOutputQueue(name="nn", maxSize=4, blocking=False)
             tracklets = device.getOutputQueue("tracklets", 4, False)
@@ -246,7 +246,7 @@ class RubbishTracker():
                     break
 
                 # Instead of get (blocking), we use tryGet (non-blocking) which will return the available data or None otherwise
-                inVideo = qVideo.tryGet()
+                inVideo = self.qVideo.tryGet()
                 inPreview = qPreview.tryGet()
                 inDet = qDet.tryGet()
 
@@ -303,6 +303,7 @@ class RubbishTracker():
                                 # check if active object lost or removed
                                 remove = False
                                 dump = False
+                                dumpedRoi = -1
                                 matching = [x for x in trackletsData if x.id == active_to.id]
                                 if len(matching) == 0:
                                     # if scoop is down, go and dump the object
@@ -316,10 +317,11 @@ class RubbishTracker():
                                         status = "Lost" if x.status == dai.Tracklet.TrackingStatus.LOST else "Removed"
                                         logging.warning(f"              {status}: {str(x.id)}")
                                         remove = True
-                                        if x.roi.y > 0.8:
+                                        dumpedRoi = x.roi.y
+                                        if x.roi.y > 0.7:
                                             dump = True
                                 if remove:
-                                    logging.warning(f"**** Removed object")
+                                    logging.warning(f"**** Removed object {active_to.id} (roi: {dumpedRoi})")
                                     if dump:
                                         logging.warning(f"**** dump object {active_to.id}")
                                         if self.sweeper is not None: 
@@ -342,7 +344,7 @@ class RubbishTracker():
                     # display count and status
                     self.display_axis_count(videoFrame)
 
-                    self.display_label_count(videoFrame, labelCounter)
+                    self.display_label_count(videoFrame)
 
 
 

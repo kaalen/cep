@@ -3,6 +3,7 @@ import tkinter as tk
 import threading, queue
 from threading import Lock
 import time
+import logging
 from numpy import datetime64
 # import cait.essentials
 from datetime import datetime
@@ -21,7 +22,7 @@ class Scooper:
     }
 
     def __init__(self, hubName=lego_hub_name,
-     dropAngle=-159, catchAngle=-130,
+     dropAngle=-165, catchAngle=-145,
       driveDuration=2, drivePower=20,
       catchDuration=2, dropDuration=5, debug=False) -> None:
 
@@ -48,6 +49,10 @@ class Scooper:
         success = self.robot.config_control_handler({
             "hub_address": self.hub_address
         })
+        if success == False:
+            logging.error("Failed to initiate hub")
+            return
+
         self.robot.display({
             "display_type": "image",
             "image": "Happy"
@@ -110,13 +115,17 @@ class Scooper:
         self.set_motor_power(self.motors["wheels"], 0)
 
     def set_motor_power(self, motor, power):
-        control_params = {
-                "motor_arrangement": "individual",
-                "motor": motor[-1],
-                "motion": "speed",
-                "speed": int(power),
-            }
-        return self.robot.control_motor(control_params)
+        try:
+            control_params = {
+                    "motor_arrangement": "individual",
+                    "motor": motor[-1],
+                    "motion": "speed",
+                    "speed": int(power),
+                }
+            return self.robot.control_motor(control_params)
+        except BaseException as err:
+            print(f"Unexpected {err=}, {type(err)=}")
+            raise
 
     def set_motor_position(self, motor, position):
         control_params = {
